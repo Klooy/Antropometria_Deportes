@@ -1,0 +1,853 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>App Antropometría - DW (corregido División)</title>
+
+<!-- SheetJS CDN -->
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+
+<style>
+  :root{
+    --primary:#2563eb;
+    --muted:#6b7280;
+    --success:#16a34a;
+    --danger:#dc2626;
+    --card:#ffffff;
+    --bg:#f3f4f6;
+    --accent:#7c3aed;
+  }
+  *{box-sizing:border-box}
+  body{font-family:Inter,Segoe UI,Roboto,Arial; background:linear-gradient(180deg,#eef2ff 0%, #f8fafc 100%); margin:0; padding:18px; color:#111}
+  .app{max-width:1200px;margin:0 auto}
+  .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 8px 30px rgba(16,24,40,0.06);margin-bottom:18px}
+  h1{margin:0 0 8px;color:var(--primary)}
+  .row{display:flex;gap:12px;flex-wrap:wrap}
+  .col{flex:1 1 300px}
+  label{display:block;font-size:13px;margin-bottom:6px;color:#344}
+  input,select{width:100%;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px;font-size:14px}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{margin:0}
+  .muted{color:var(--muted);font-size:13px}
+  .small{font-size:12px;color:var(--muted)}
+  .help{font-size:13px;color:#374151;margin-bottom:8px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .btn{padding:10px 14px;border-radius:8px;border:0;cursor:pointer;font-weight:600}
+  .btn-primary{background:var(--primary);color:white}
+  .btn-ghost{background:white;border:1px solid #e5e7eb;color:#111}
+  .btn-success{background:var(--success);color:white}
+  .controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .counter{font-weight:700;color:var(--primary)}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px;border-bottom:1px solid #eef2ff;text-align:left}
+  th{background:#fbfdff;position:sticky;top:0}
+  .actions{display:flex;gap:6px}
+  .chip{display:inline-block;padding:6px 8px;border-radius:999px;background:#f1f5f9;font-size:12px}
+  .danger{border-color:var(--danger);box-shadow:0 0 0 3px rgba(220,38,38,0.08)}
+  .warning{border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.06)}
+  .ok{border-color:var(--success)}
+  .progress{height:10px;background:#e6eefc;border-radius:999px;overflow:hidden}
+  .progress > i{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--primary));width:0%}
+  .searchbar{display:flex;gap:8px;align-items:center}
+  .flex-center{display:flex;align-items:center;gap:8px}
+  .sortable{cursor:pointer;color:#0f172a}
+  .hidden{display:none}
+  .file-input{display:none}
+  .toast{position:fixed;right:20px;bottom:20px;background:#111;color:white;padding:10px 16px;border-radius:8px;box-shadow:0 6px 20px rgba(2,6,23,0.4)}
+  @media (max-width:900px){ .two{grid-template-columns:1fr} .col{flex-basis:100%} th,td{font-size:12px} }
+</style>
+</head>
+<body>
+  <div class="app">
+
+    <div class="card">
+      <h1>Registro Antropometría</h1>
+      <p class="muted">Formulario por dimensiones. Usa <strong>Enter</strong> para guardar y <strong>Ctrl+L</strong> para limpiar.</p>
+
+      <div style="display:flex;gap:12px;align-items:center;margin-top:12px">
+        <div style="flex:1">
+          <div class="progress" title="Progreso campos obligatorios">
+            <i id="progbar" style="width:0%"></i>
+          </div>
+          <div class="small" style="margin-top:6px">Progreso del formulario: <span id="progtext">0%</span></div>
+        </div>
+        <div class="flex-center">
+          <span class="small">Registros guardados:</span>
+          <div class="counter" id="count">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- FORM -->
+    <div class="card" id="formCard" tabindex="0">
+      <form id="mainForm" onsubmit="event.preventDefault(); guardarRegistro();" autocomplete="off">
+        <div style="display:flex;gap:12px;flex-wrap:wrap">
+          <!-- DimPersona -->
+          <div class="col card" style="padding:12px">
+            <h3 style="margin:0 0 10px">🧍 DimPersona</h3>
+            <div class="two">
+              <div>
+                <label>ID <span class="small">(*)</span></label>
+                <input id="ID" name="ID" type="text" inputmode="numeric" placeholder="ej: 001" />
+              </div>
+              <div>
+                <label>Sexo</label>
+                <select id="Sexo"><option value="">-- (opcional) --</option><option value="1">Masculino</option><option value="0">Femenino</option></select>
+              </div>
+
+              <div>
+                <label>Nombre <span class="small">(*)</span></label>
+                <input id="Nombre" name="Nombre" type="text" placeholder="Nombre" />
+              </div>
+              <div>
+                <label>Apelllido</label>
+                <input id="Apelllido" name="Apelllido" type="text" placeholder="Apellido (se mantiene ortografía)" />
+              </div>
+
+              <div>
+                <label>Edad <span class="small">(*)</span></label>
+                <input id="Edad" type="number" min="1" max="120" placeholder="Años" />
+              </div>
+              <div>
+                <label>División / Categoría</label>
+                <input id="Division" type="text" readonly />
+              </div>
+
+              <div>
+                <label>Peso (kg) <span class="small">(*)</span></label>
+                <input id="Peso" type="number" step="0.1" placeholder="20.0 - 200.0" />
+              </div>
+              <div>
+                <label>Altura (cm) <span class="small">(*)</span></label>
+                <input id="Altura" type="number" step="0.1" placeholder="50.0 - 250.0" />
+              </div>
+            </div>
+            <div class="small help" style="margin-top:8px">La división se calcula automáticamente según edad.</div>
+          </div>
+
+          <!-- DimInstitucion -->
+          <div class="col card" style="padding:12px">
+            <h3 style="margin:0 0 10px">🏫 DimInstitucion</h3>
+            <label>Insititucion <span class="small">(*)</span></label>
+            <input id="Insititucion" list="instituciones" placeholder="Nombre institución" />
+            <datalist id="instituciones"></datalist>
+
+            <div class="small help" style="margin-top:8px">Autocompleta instituciones frecuentes (se alimenta desde registros guardados).</div>
+          </div>
+
+          <!-- DimAntropometria -->
+          <div class="col card" style="padding:12px">
+            <h3 style="margin:0 0 10px">📏 DimAntropometria</h3>
+            <div class="two">
+              <div>
+                <label>PlTr (tríceps, mm)</label>
+                <input id="PlTr" type="number" step="0.1" placeholder="0.0 - 100.0" />
+              </div>
+              <div>
+                <label>PlSubEsc (subescapular)</label>
+                <input id="PlSubEsc" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PlCI (cresta iliaca)</label>
+                <input id="PlCI" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PlSup (supraespinal)</label>
+                <input id="PlSup" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PlAbd (abdominal)</label>
+                <input id="PlAbd" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PlMM (muslo medio)</label>
+                <input id="PlMM" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PlPant (pantorrilla)</label>
+                <input id="PlPant" type="number" step="0.1" />
+              </div>
+            </div>
+            <div class="small help" style="margin-top:6px">Suma de pliegues y fórmulas automáticas abajo.</div>
+          </div>
+
+          <!-- DimPerimetros -->
+          <div class="col card" style="padding:12px">
+            <h3 style="margin:0 0 10px">📐 DimPerimetros</h3>
+            <div class="two">
+              <div>
+                <label>PerBrazoRel (cm)</label>
+                <input id="PerBrazoRel" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerBrazoCon (cm)</label>
+                <input id="PerBrazoCon" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerT (caja torácica, cm)</label>
+                <input id="PerT" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerCin (cintura, cm)</label>
+                <input id="PerCin" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerCad (cadera, cm)</label>
+                <input id="PerCad" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerMuslo (cm)</label>
+                <input id="PerMuslo" type="number" step="0.1" />
+              </div>
+              <div>
+                <label>PerPier (cm)</label>
+                <input id="PerPier" type="number" step="0.1" />
+              </div>
+            </div>
+          </div>
+
+          <!-- DimPruebasFisicas -->
+        <div class="col card" style="padding:12px">
+        <h3 style="margin:0 0 10px">🧪 DimPruebasFisicas</h3>
+        <div class="two">
+            <div>
+            <label>Test_Abd (reps)</label>
+            <input id="Test_Abd" type="number" step="0.1" />
+            </div>
+            <div>
+            <label>Clasi_ClsAbd</label>
+            <select id="Clasi_ClsAbd">
+                <option value="">-- Seleccionar --</option>
+                <option value="Malo">Malo</option>
+                <option value="Bueno">Bueno</option>
+                <option value="Excelente">Excelente</option>
+            </select>
+            </div>
+
+            <div>
+            <label>Test_FlexCLS (reps)</label>
+            <input id="Test_FlexCLS" type="number" step="0.1" />
+            </div>
+            <div>
+            <label>Clasi_ClsFlex</label>
+            <select id="Clasi_ClsFlex">
+                <option value="">-- Seleccionar --</option>
+                <option value="Malo">Malo</option>
+                <option value="Bueno">Bueno</option>
+                <option value="Excelente">Excelente</option>
+            </select>
+            </div>
+
+            <div>
+            <label>Test_Salto (cm)</label>
+            <input id="Test_Salto" type="number" step="0.1" />
+            </div>
+            <div>
+            <label>Clasi_salto</label>
+            <select id="Clasi_salto">
+                <option value="">-- Seleccionar --</option>
+                <option value="Malo">Malo</option>
+                <option value="Bueno">Bueno</option>
+                <option value="Excelente">Excelente</option>
+            </select>
+            </div>
+
+            <div>
+            <label>Test_Cooper (m)</label>
+            <input id="Test_Cooper" type="number" step="0.1" />
+            </div>
+            <div>
+            <label>Clasi_Coop</label>
+            <select id="Clasi_Coop">
+                <option value="">-- Seleccionar --</option>
+                <option value="Malo">Malo</option>
+                <option value="Bueno">Bueno</option>
+                <option value="Excelente">Excelente</option>
+            </select>
+            </div>
+        </div>
+        </div>
+
+          <!-- DimTiempo / cálculos rápidos -->
+          <div class="col card" style="padding:12px">
+            <h3 style="margin:0 0 10px">📅 DimTiempo y Cálculos</h3>
+            <label>Fecha de Evaluación</label>
+            <input id="Fecha" type="date" />
+
+            <div style="margin-top:10px" class="two">
+              <div>
+                <label>IMC (kg/m²)</label>
+                <input id="IMC" readonly />
+              </div>
+              <div>
+                <label>Suma Pliegues (mm)</label>
+                <input id="SumPliegues" readonly />
+              </div>
+              <div>
+                <label>% Grasa (Deurenberg)</label>
+                <input id="PctGrasa" readonly />
+              </div>
+              <div>
+                <label>Cintura/Cadera</label>
+                <input id="WaistHip" readonly />
+              </div>
+              <div>
+                <label>Índice Conicidad</label>
+                <input id="Conicity" readonly />
+              </div>
+            </div>
+
+            <div class="small help" style="margin-top:8px">Los cálculos se actualizan en tiempo real cuando se ingresan los datos necesarios.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:12px;justify-content:flex-end;align-items:center">
+          <button class="btn btn-ghost" type="button" onclick="limpiarCampos()" title="Ctrl+L">🧽 Limpiar</button>
+          <button class="btn btn-primary" type="submit">💾 Guardar (Enter)</button>
+          <button class="btn btn-success" type="button" onclick="guardarRegistro(false,true)">📤 Guardar y Exportar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- CONTROLES Y PREVISUALIZACION -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+        <div class="searchbar">
+          <input id="search" placeholder="Buscar por Nombre, ID o Institución..." style="padding:8px 10px;border-radius:8px;border:1px solid #d1d5db" />
+          <select id="filterDivision" style="padding:8px;border-radius:8px;border:1px solid #d1d5db">
+            <option value="">-- Filtrar División --</option>
+          </select>
+          <label style="display:flex;align-items:center;gap:6px"><input id="showComputed" type="checkbox" checked /> Mostrar columnas calculadas</label>
+        </div>
+
+        <div class="controls">
+          <label class="small">Importar Excel</label>
+          <input id="fileImport" class="file-input" type="file" accept=".xlsx,.xls" />
+          <label class="btn btn-ghost" for="fileImport">📁 Seleccionar</label>
+
+          <button class="btn btn-primary" onclick="exportarExcel()">📥 Exportar Excel</button>
+          <button class="btn btn-ghost" onclick="vaciarTodos()">🗑️ Borrar todo</button>
+        </div>
+      </div>
+
+      <div style="margin-top:12px;overflow:auto;max-height:520px">
+        <table id="tablePreview">
+          <thead>
+            <tr id="tableHead"></tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card small muted">
+      <strong>Atajos:</strong> Enter = guardar | Ctrl+L = limpiar formulario | Click en encabezado = ordenar.
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+
+<script>
+/* ---------- CONFIG ---------- */
+const EXCEL_COLUMNS = [
+  "ID","Insititucion","Nombre","Apelllido","Sexo","Edad","Division","Peso","Altura",
+  "PlTr","PlSubEsc","PlCI","PlSup","PlAbd","PlMM","PlPant",
+  "PerBrazoRel","PerBrazoCon","PerT","PerCin","PerCad","PerMuslo","PerPier",
+  "Test_Abd","Clasi_ClsAbd","Test_FlexCLS","Clasi_ClsFlex","Test_Salto","Clasi_salto","Test_Cooper","Clasi_Coop",
+  "Fecha",
+  // columnas calculadas (opcionales)
+  "IMC","SumPliegues","PctGrasa","WaistHip","Conicity"
+];
+
+let registros = []; // array de objetos
+let editIndex = -1; // índice si estamos editando
+
+/* ---------- UTIL ---------- */
+function toast(msg, ms=2500){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.remove('hidden');
+  setTimeout(()=> t.classList.add('hidden'), ms);
+}
+function q(id){ return document.getElementById(id); }
+function num(v){ return v===""?NaN: Number(v); }
+
+/* ---------- CARGA / LOCALSTORAGE ---------- */
+function loadFromStorage(){
+  const raw = localStorage.getItem('antropometria_registros_v1');
+  if(raw){
+    try{
+      registros = JSON.parse(raw) || [];
+    }catch(e){ registros = [] }
+  } else registros = [];
+  rebuildInstitutionsDatalist();
+  rebuildFilterOptions();
+  renderTable();
+  updateCount();
+}
+function saveToStorage(){
+  localStorage.setItem('antropometria_registros_v1', JSON.stringify(registros));
+  rebuildInstitutionsDatalist();
+  rebuildFilterOptions();
+}
+
+/* ---------- PROGRESO Y VALIDACIONES ---------- */
+const requiredFields = ["ID","Nombre","Edad","Peso","Altura","Insititucion"];
+function updateProgress(){
+  let filled = 0;
+  requiredFields.forEach(f => { if(q(f).value && q(f).value.toString().trim()!=="") filled++; });
+  const pct = Math.round( (filled / requiredFields.length) * 100 );
+  q('progbar').style.width = pct + '%';
+  q('progtext').textContent = pct + '%';
+}
+function setValidationClass(el, state){ // state: '', 'danger','warning','ok'
+  if(!el) return;
+  el.classList.remove('danger','warning','ok');
+  if(state) el.classList.add(state);
+}
+
+/* validaciones por rango - se usan en tiempo real */
+function validateRanges(){
+  // peso 20-200, altura 50-250
+  const peso = num(q('Peso').value);
+  const altura = num(q('Altura').value);
+  setValidationClass(q('Peso'), (isNaN(peso)?'': (peso<20||peso>200 ? 'danger' : 'ok')));
+  setValidationClass(q('Altura'), (isNaN(altura)?'': (altura<50||altura>250 ? 'danger' : 'ok')));
+
+  // pliegues 0-100
+  ['PlTr','PlSubEsc','PlCI','PlSup','PlAbd','PlMM','PlPant'].forEach(id=>{
+    const v = num(q(id).value);
+    setValidationClass(q(id), (isNaN(v)?'': (v<0||v>100 ? 'warning' : '')));
+  });
+
+  // perímetros 5-300
+  ['PerBrazoRel','PerBrazoCon','PerT','PerCin','PerCad','PerMuslo','PerPier'].forEach(id=>{
+    const v = num(q(id).value);
+    setValidationClass(q(id), (isNaN(v)?'': (v<5||v>300 ? 'warning' : '')));
+  });
+
+  // tests valores plausibles
+  [['Test_Abd',0,500], ['Test_FlexCLS',0,500], ['Test_Salto',0,1000], ['Test_Cooper',0,20000]].forEach(([id,min,max])=>{
+    const v = num(q(id).value);
+    setValidationClass(q(id), (isNaN(v)?'': (v<min||v>max ? 'warning' : '')));
+  });
+}
+
+/* ---------- CÁLCULOS ---------- */
+function calcularDerivados(){
+  // IMC
+  const peso = num(q('Peso').value);
+  const alturaCm = num(q('Altura').value);
+  const alturaM = !isNaN(alturaCm) ? alturaCm/100 : NaN;
+  const imc = (!isNaN(peso) && !isNaN(alturaM) && alturaM>0) ? (peso / (alturaM*alturaM)) : NaN;
+  q('IMC').value = isNaN(imc)?'': imc.toFixed(2);
+
+  // Suma pliegues
+  const plegIds = ['PlTr','PlSubEsc','PlCI','PlSup','PlAbd','PlMM','PlPant'];
+  let sum = 0; let some=false;
+  plegIds.forEach(id=>{
+    const v = num(q(id).value);
+    if(!isNaN(v)){ sum += v; some=true; }
+  });
+  q('SumPliegues').value = some ? sum.toFixed(1) : '';
+
+  // % grasa (Deurenberg) => requires IMC, Edad, Sexo
+  const edad = num(q('Edad').value);
+  const sexo = q('Sexo').value; // '1' Masculino, '0' Femenino
+  if(!isNaN(imc) && !isNaN(edad) && (sexo==='0' || sexo==='1')){
+    const Pct = 1.20*imc + 0.23*edad - 10.8*(Number(sexo)) - 5.4;
+    q('PctGrasa').value = Pct.toFixed(1);
+  } else q('PctGrasa').value = '';
+
+  // Waist/Hip
+  const waist = num(q('PerCin').value);
+  const hip = num(q('PerCad').value);
+  q('WaistHip').value = (!isNaN(waist) && !isNaN(hip) && hip>0) ? (waist/hip).toFixed(3) : '';
+
+  // Conicity index
+  if(!isNaN(waist) && !isNaN(peso) && !isNaN(alturaCm)){
+    const waist_m = waist / 100;
+    const height_m = alturaCm / 100;
+    if(waist_m>0 && height_m>0){
+      const CI = waist_m / (0.109 * Math.sqrt(peso / height_m));
+      q('Conicity').value = CI.toFixed(3);
+    } else q('Conicity').value = '';
+  } else q('Conicity').value = '';
+}
+
+/* ---------- DIVISION por edad (FIX) ---------- */
+function calcDivisionAuto(){
+  const edad = num(q('Edad').value);
+  if(isNaN(edad) || edad === null || q('Edad').value === ''){ q('Division').value = ''; return; }
+  let div = '';
+  if(edad < 13) div = 'Sub-13';
+  else if(edad < 15) div = 'Sub-15';
+  else if(edad < 17) div = 'Sub-17';
+  else if(edad < 19) div = 'Sub-19';
+  else if(edad < 21) div = 'Sub-21';
+  else div = 'Mayores';
+  q('Division').value = div;
+}
+
+/* ---------- CRUD EN MEMORIA ---------- */
+function construirRegistroDesdeFormulario(){
+  const r = {};
+  EXCEL_COLUMNS.forEach(col => {
+    r[col] = (q(col) && q(col).value !== undefined) ? q(col).value : '';
+  });
+  // ensure computed fields match latest
+  r.IMC = q('IMC').value || '';
+  r.SumPliegues = q('SumPliegues').value || '';
+  r.PctGrasa = q('PctGrasa').value || '';
+  r.WaistHip = q('WaistHip').value || '';
+  r.Conicity = q('Conicity').value || '';
+  return r;
+}
+
+function cargarFormularioDesdeRegistro(idx){
+  const r = registros[idx];
+  if(!r) return;
+  EXCEL_COLUMNS.forEach(col=>{
+    if(q(col)) q(col).value = r[col] || '';
+  });
+  // also computed
+  if(q('IMC')) q('IMC').value = r.IMC || '';
+  if(q('SumPliegues')) q('SumPliegues').value = r.SumPliegues || '';
+  if(q('PctGrasa')) q('PctGrasa').value = r.PctGrasa || '';
+  if(q('WaistHip')) q('WaistHip').value = r.WaistHip || '';
+  if(q('Conicity')) q('Conicity').value = r.Conicity || '';
+  editIndex = idx;
+  window.scrollTo({top:0,behavior:'smooth'});
+  toast('Modo edición: registró #' + (idx+1),1500);
+}
+
+function guardarRegistro(autoExport=false, exportAfter=false){
+  // validate required
+  updateProgress();
+  validateRanges();
+  // ensure division and derived fields updated
+  calcDivisionAuto();
+  calcularDerivados();
+
+  const r = construirRegistroDesdeFormulario();
+  if(!r.ID || !r.Nombre || !r.Insititucion || !r.Edad || !r.Peso || !r.Altura){
+    if(!confirm('Faltan campos obligatorios. ¿Deseas guardar igual?')) return;
+  }
+
+  if(editIndex >= 0){
+    registros[editIndex] = r;
+    toast('Registro actualizado');
+    editIndex = -1;
+  } else {
+    registros.push(r);
+    toast('Registro guardado');
+  }
+  saveToStorage();
+  renderTable();
+  limpiarCamposExceptDivision();
+  updateCount();
+
+  if(exportAfter) exportarExcel();
+  if(autoExport) exportarExcel();
+}
+
+/* limpiar manteniendo Division */
+function limpiarCamposExceptDivision(){
+  const keep = ['Division','editDivision'];
+  Array.from(document.querySelectorAll('input,select')).forEach(inp=>{
+    if(keep.includes(inp.id)) return;
+    if(inp.type === 'checkbox') inp.checked = false;
+    else inp.value = '';
+  });
+  q('Division').value = '';
+  updateProgress();
+}
+
+/* limpiar total */
+function limpiarCampos(){
+  if(!confirm('¿Limpiar todos los campos?')) return;
+  Array.from(document.querySelectorAll('input,select')).forEach(inp=>{
+    if(inp.type === 'checkbox') inp.checked = false;
+    else inp.value = '';
+  });
+  editIndex = -1;
+  updateProgress();
+  calcularDerivados();
+}
+
+/* Vaciar todos los registros */
+function vaciarTodos(){
+  if(!confirm('Borrar todos los registros guardados? Esto no se puede deshacer.')) return;
+  registros = [];
+  saveToStorage();
+  renderTable();
+  updateCount();
+  rebuildInstitutionsDatalist();
+}
+
+/* ---------- TABLA DE PREVISUALIZACION ---------- */
+let currentSort = {col:null,dir:1};
+
+function renderTable(){
+  const tbody = q('tableBody'); tbody.innerHTML = '';
+  const head = q('tableHead'); head.innerHTML = '';
+
+  // Determine columns to show (hide computed if unchecked)
+  const showComputed = q('showComputed').checked;
+  const cols = EXCEL_COLUMNS.filter(c=>{
+    if(!showComputed && ['IMC','SumPliegues','PctGrasa','WaistHip','Conicity'].includes(c)) return false;
+    return true;
+  });
+
+  // build head
+  cols.forEach(col=>{
+    const th = document.createElement('th');
+    th.textContent = col;
+    th.className = 'sortable';
+    th.onclick = ()=> sortByColumn(col);
+    head.appendChild(th);
+  });
+  const thActions = document.createElement('th'); thActions.textContent = 'Acciones'; head.appendChild(thActions);
+
+  // apply search & filter
+  const qtext = q('search').value.trim().toLowerCase();
+  const filterDiv = q('filterDivision').value;
+
+  const filtered = registros.filter(r=>{
+    if(filterDiv && (r.Division||'') !== filterDiv) return false;
+    if(!qtext) return true;
+    const hay = (r.Nombre||'') + ' ' + (r.ID||'') + ' ' + (r.Insititucion||'');
+    return hay.toLowerCase().includes(qtext);
+  });
+
+  // sort
+  if(currentSort.col){
+    filtered.sort((a,b)=>{
+      const A = (a[currentSort.col]||'').toString().toLowerCase();
+      const B = (b[currentSort.col]||'').toString().toLowerCase();
+      if(A<B) return -1 * currentSort.dir;
+      if(A>B) return 1 * currentSort.dir;
+      return 0;
+    });
+  }
+
+  filtered.forEach((r, idx)=>{
+    const tr = document.createElement('tr');
+    cols.forEach(c=>{
+      const td = document.createElement('td');
+      td.textContent = r[c] || '';
+      tr.appendChild(td);
+    });
+
+    // actions
+    const tdact = document.createElement('td');
+    tdact.className = 'actions';
+    const btnEdit = document.createElement('button');
+    btnEdit.className = 'btn btn-ghost'; btnEdit.textContent = '✏️';
+    btnEdit.onclick = ()=> {
+      const realIdx = registros.indexOf(r);
+      if(realIdx>=0) cargarFormularioDesdeRegistro(realIdx);
+    };
+    const btnDel = document.createElement('button');
+    btnDel.className = 'btn'; btnDel.style.background='#fee2e2'; btnDel.textContent = '🗑️';
+    btnDel.onclick = ()=> {
+      if(!confirm('Eliminar registro?')) return;
+      const realIdx = registros.indexOf(r);
+      if(realIdx>=0) registros.splice(realIdx,1);
+      saveToStorage();
+      renderTable();
+      updateCount();
+    };
+    tdact.appendChild(btnEdit); tdact.appendChild(btnDel);
+    tr.appendChild(tdact);
+    tbody.appendChild(tr);
+  });
+
+  // if none
+  if(filtered.length===0){
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = cols.length + 1;
+    td.style.textAlign = 'center';
+    td.style.color = '#6b7280';
+    td.textContent = 'No hay registros que mostrar';
+    tr.appendChild(td); tbody.appendChild(tr);
+  }
+}
+
+/* ---------- ORDENAR ---------- */
+function sortByColumn(col){
+  if(currentSort.col === col) currentSort.dir *= -1;
+  else { currentSort.col = col; currentSort.dir = 1; }
+  renderTable();
+}
+
+/* ---------- BÚSQUEDA / FILTRO ---------- */
+q('search')?.addEventListener('input', ()=>{
+  renderTable();
+});
+q('filterDivision')?.addEventListener('change', renderTable);
+
+/* ---------- INSTITUTIONS AUTOCOMPLETE ---------- */
+function rebuildInstitutionsDatalist(){
+  const set = new Set(registros.map(r=> (r.Insititucion||'').trim()).filter(Boolean));
+  const dt = q('instituciones'); dt.innerHTML = '';
+  Array.from(set).forEach(v=>{
+    const opt = document.createElement('option'); opt.value = v; dt.appendChild(opt);
+  });
+}
+function rebuildFilterOptions(){
+  // fill divisions
+  const set = new Set(registros.map(r=> (r.Division||'').trim()).filter(Boolean));
+  const sel = q('filterDivision'); const prev = sel.value;
+  sel.innerHTML = '<option value="">-- Filtrar División --</option>';
+  Array.from(set).forEach(v=>{
+    const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o);
+  });
+  sel.value = prev || '';
+}
+
+/* ---------- IMPORT / EXPORT EXCEL ---------- */
+function exportarExcel(){
+  if(registros.length===0){ alert('No hay registros para exportar.'); return; }
+
+  // Build rows with header
+  const header = EXCEL_COLUMNS;
+  const rows = [header];
+  registros.forEach(r=>{
+    rows.push(header.map(h=> r[h] || ''));
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'ANTROPOMETRIA_ALEMANA');
+
+  try{
+    XLSX.writeFile(wb, 'ANTROPOMETRIA_ALEMANA.xlsx');
+    toast('Excel generado');
+  }catch(e){
+    // fallback
+    const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+    const blob = new Blob([wbout], {type:'application/octet-stream'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = 'ANTROPOMETRIA_ALEMANA.xlsx';
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    toast('Excel generado (fallback)');
+  }
+}
+q('fileImport').addEventListener('change', (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const data = new Uint8Array(e.target.result);
+    const wb = XLSX.read(data, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const arr = XLSX.utils.sheet_to_json(sheet, {defval:''});
+    arr.forEach(row=>{
+      const r = {};
+      EXCEL_COLUMNS.forEach(col => { r[col] = row[col] !== undefined ? row[col] : ''; });
+      
+      // Calcular División automáticamente
+      const edad = num(r.Edad);
+      if(!isNaN(edad) && edad !== null && r.Edad !== ''){
+        if(edad < 13) r.Division = 'Sub-13';
+        else if(edad < 15) r.Division = 'Sub-15';
+        else if(edad < 17) r.Division = 'Sub-17';
+        else if(edad < 19) r.Division = 'Sub-19';
+        else if(edad < 21) r.Division = 'Sub-21';
+        else r.Division = 'Mayores';
+      }
+      
+      // Calcular campos derivados
+      const peso = num(r.Peso);
+      const alturaCm = num(r.Altura);
+      const alturaM = !isNaN(alturaCm) ? alturaCm/100 : NaN;
+      
+      // IMC
+      const imc = (!isNaN(peso) && !isNaN(alturaM) && alturaM>0) ? (peso / (alturaM*alturaM)) : NaN;
+      r.IMC = isNaN(imc) ? '' : imc.toFixed(2);
+      
+      // Suma pliegues
+      const plegIds = ['PlTr','PlSubEsc','PlCI','PlSup','PlAbd','PlMM','PlPant'];
+      let sum = 0; let some=false;
+      plegIds.forEach(id=>{
+        const v = num(r[id]);
+        if(!isNaN(v)){ sum += v; some=true; }
+      });
+      r.SumPliegues = some ? sum.toFixed(1) : '';
+      
+      // % Grasa (Deurenberg) - solo si existe el campo Sexo en el registro
+      if(r.Sexo !== undefined && r.Sexo !== ''){
+        let sexoNum = null;
+        const sexoVal = String(r.Sexo).trim();
+        // Convertir diferentes formatos a 1 (Masculino) o 0 (Femenino)
+        if(sexoVal === '1' || sexoVal === 1 || sexoVal.toLowerCase() === 'masculino' || sexoVal.toLowerCase() === 'm') sexoNum = 1;
+        else if(sexoVal === '0' || sexoVal === 0 || sexoVal.toLowerCase() === 'femenino' || sexoVal.toLowerCase() === 'f') sexoNum = 0;
+        
+        if(!isNaN(imc) && !isNaN(edad) && sexoNum !== null){
+          const Pct = 1.20*imc + 0.23*edad - 10.8*sexoNum - 5.4;
+          r.PctGrasa = Pct.toFixed(1);
+        } else r.PctGrasa = '';
+      } else {
+        r.PctGrasa = ''; // No se puede calcular sin Sexo
+      }
+      
+      // Waist/Hip (Cintura/Cadera)
+      const waist = num(r.PerCin);
+      const hip = num(r.PerCad);
+      r.WaistHip = (!isNaN(waist) && !isNaN(hip) && hip>0) ? (waist/hip).toFixed(3) : '';
+      
+      // Conicity index
+      if(!isNaN(waist) && !isNaN(peso) && !isNaN(alturaCm)){
+        const waist_m = waist / 100;
+        const height_m = alturaCm / 100;
+        if(waist_m>0 && height_m>0){
+          const CI = waist_m / (0.109 * Math.sqrt(peso / height_m));
+          r.Conicity = CI.toFixed(3);
+        } else r.Conicity = '';
+      } else r.Conicity = '';
+      
+      registros.push(r);
+    });
+    saveToStorage(); renderTable(); updateCount();
+    toast('Importación completada: ' + arr.length + ' filas con cálculos automáticos');
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+/* ---------- UTILitarios UI ---------- */
+function updateCount(){ q('count').textContent = registros.length; rebuildInstitutionsDatalist(); rebuildFilterOptions(); }
+
+document.querySelectorAll('input,select').forEach(el=>{
+  el.addEventListener('input', ()=>{
+    updateProgress();
+    validateRanges();
+    calcularDerivados();
+    calcDivisionAuto();            // <-- FIX: asegurar cálculo de División en tiempo real
+  });
+});
+
+/* Atajos teclado */
+document.addEventListener('keydown', (e)=>{
+  if(e.key === 'Enter' && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'SELECT')) {
+    e.preventDefault();
+    guardarRegistro();
+  }
+  if(e.ctrlKey && (e.key === 'l' || e.key === 'L')){
+    e.preventDefault();
+    limpiarCampos();
+  }
+});
+
+/* Inicialización */
+loadFromStorage();
+updateProgress();
+validateRanges();
+calcularDerivados();
+calcDivisionAuto();   // <-- FIX: calcular división al iniciar si Edad ya tiene valor
+renderTable();
+updateCount();
+
+</script>
+</body>
+</html>
